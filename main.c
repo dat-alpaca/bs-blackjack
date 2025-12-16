@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/time.h>
 
@@ -62,6 +63,7 @@ int kbhit (void)
 int get_char()
 {
     char ch = getchar();
+    return ch;
 }
 
 // utils.h:
@@ -82,6 +84,9 @@ typedef struct game_data
     int deckIndex;
     int playerHandIndex;
     int dealerHandIndex;
+
+    int playerScore;
+    int dealerScore;
 } game_data;
 
 static void initialize_deck(int* deck)
@@ -108,15 +113,15 @@ static int get_card_value(int card)
     if(card == 1)
         return 1;
 
-    if(card >= 10)
-        return 1;
+    else if(card >= 10)
+        return 10;
     
     return card;
 }
 
 static void draw_card(int* deck, int* deckPosition, int* user, int* currentPosition)
 {
-    if(currentPosition >= 13)
+    if(*currentPosition >= 13)
         // TODO: fatal
         return;
 
@@ -125,16 +130,19 @@ static void draw_card(int* deck, int* deckPosition, int* user, int* currentPosit
     (*deckPosition)++;
     (*currentPosition)++;
 }
-draw_card(game->playerHand)
 
 static void initialize(game_data* data)
 {
+    srand(time(NULL));
+
     initialize_deck(data->deck);
     shuffle_deck(data->deck);
 
-    data->deckIndex = 0;
-    data->playerHandIndex = 0;
-    data->dealerHandIndex = 0;
+    data->dealerScore       = 0;
+    data->playerScore       = 0;
+    data->deckIndex         = 0;
+    data->playerHandIndex   = 0;
+    data->dealerHandIndex   = 0;
 }
 
 // display:
@@ -155,12 +163,17 @@ static void ui_cycle_option(ui_data* ui)
     ui->option = (ui_option)(((int)ui->option + 1) % UI_OPTION_AMOUNT);
 }
 
-static void print_options()
+static void print_header()
 {
-    printf(CLEAR_SCREEN);
     printf("\n");
     printf(GREEN "-=-= >" RED " Blackjack " GREEN "< =-=-\n" RESET);
     printf("\n");
+}
+
+static void print_options()
+{
+    printf(CLEAR_SCREEN);
+    print_header();
     printf("Use the W and S keys to switch through the options.\n");
     printf("Press E to select the option chosen.\n\n");
 }
@@ -186,6 +199,62 @@ static void print_menu(ui_data* ui)
 }
 
 // game display
+static void print_card(int card)
+{
+    switch(card)
+    {
+        case 1:
+            printf("Ace");
+            break;
+
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+            printf("Card %d", card);
+            break;
+        
+        case 11:
+            printf("Jack");
+            break;
+
+        case 12:
+            printf("Queen");
+            break;
+
+        case 13:
+            printf("King");
+            break;
+    }
+}
+
+static void print_cards(int* hand, int index)
+{
+    for(int i = 0; i < index; ++i)
+    {
+        printf("* ");
+        print_card(hand[i]);
+        printf("\n");
+    }
+}
+
+static void print_win(game_data* data)
+{
+    disable_raw_mode();
+    printf("%s%d\n", GREEN "You Win!" RESET " You got a score of ", data->playerScore);
+    printf("The dealer got a score of: %d\n", data->dealerScore);
+}
+
+static void print_lose(game_data* data)
+{
+    disable_raw_mode();
+    printf("%s%d\n", RED "Oh no!" RESET " You got a score of ", data->playerScore);
+}
 
 int main()
 {
@@ -200,10 +269,9 @@ int main()
 
     enable_raw_mode();
 
-    bool gameRunning = true;
-    while(gameRunning)
+    while(1)
     {
-        while (!kbhit() && gameRunning);
+        while (!kbhit());
         int ch = get_char();
 
         if(ch == 'q')
@@ -232,17 +300,98 @@ int main()
         enable_raw_mode();
     }
 
+    disable_raw_mode();
+    printf(CLEAR_SCREEN);
+    print_header();
+
     // game
-    int playerCard0 = draw_card(game->deck, game->deckIndex, game->playerHand, game->playerHandIndex);
-    print("%d\n", playerCard0);
-    playerCard0 = draw_card(game->deck, game->deckIndex, game->playerHand, game->playerHandIndex);
-    print("%d\n", playerCard0);
+    draw_card(game.deck, &game.deckIndex, game.playerHand, &game.playerHandIndex);
+    draw_card(game.deck, &game.deckIndex, game.dealerHand, &game.dealerHandIndex);
+    draw_card(game.deck, &game.deckIndex, game.playerHand, &game.playerHandIndex);
+    draw_card(game.deck, &game.deckIndex, game.dealerHand, &game.dealerHandIndex);
 
-    playerCard0 = draw_card(game->deck, game->deckIndex, game->playerHand, game->playerHandIndex);
-    print("%d\n", playerCard0);
-    playerCard0 = draw_card(game->deck, game->deckIndex, game->playerHand, game->playerHandIndex);
-    print("%d\n", playerCard0);
-    playerCard0 = draw_card(game->deck, game->deckIndex, game->playerHand, game->playerHandIndex);
-    print("%d\n", playerCard0);
+    game.playerScore += get_card_value(game.playerHand[0]);
+    game.playerScore += get_card_value(game.playerHand[1]);
+    game.dealerScore += get_card_value(game.dealerHand[0]);
+    game.dealerScore += get_card_value(game.dealerHand[1]);
 
+    // Game starts:
+    printf(CLEAR_SCREEN);
+    print_header();
+
+    printf("Your cards are:\n");
+    print_cards(game.playerHand, game.playerHandIndex);
+    printf("Which sums up to: %d\n\n", game.playerScore);
+    printf("Press 'H' to Hit, and 'S' to Stand\n");
+
+    int option = 0;
+    while(1)
+    {
+        // TODO; print round
+        enable_raw_mode();
+        while (!kbhit());
+        int ch = get_char();
+        disable_raw_mode();
+
+        if(ch == 'q')
+        {
+            printf(CLEAR_SCREEN);
+            return 1;
+        }
+
+        if(ch == 'h' || ch == 'H')
+        {
+            draw_card(game.deck, &game.deckIndex, game.playerHand, &game.playerHandIndex);
+            game.playerScore += get_card_value(game.playerHand[game.playerHandIndex - 1]);
+            option = 1;
+        }
+
+        if(ch == 's'|| ch == 'S')
+        {
+            option = 2;
+            break;
+        }
+    
+        printf(CLEAR_SCREEN);
+        print_header();
+
+        if(option == 1)
+        {
+            printf("You have decided to hit... And you drew... ");
+            print_card(game.playerHand[game.playerHandIndex - 1]);
+            printf("\n\n");
+        }
+
+        printf("Your cards are:\n");
+        print_cards(game.playerHand, game.playerHandIndex);
+        printf("Which sums up to: %d\n\n", game.playerScore);
+        printf("Press 'H' to Hit, and 'S' to Stand\n");
+
+        if(game.playerScore > 21)
+        {
+            print_lose(&game);
+            return 0;
+        }
+    }
+
+    printf(CLEAR_SCREEN);
+    print_header();
+    printf("You have decided to stand. Now is the dealer's turn...\n");
+
+    while(game.dealerScore < 17)
+    {
+        printf("The dealer draws a... ");
+
+        draw_card(game.deck, &game.deckIndex, game.dealerHand, &game.dealerHandIndex);
+        game.dealerScore += get_card_value(game.dealerHand[game.dealerHandIndex - 1]);
+
+        print_card(game.dealerHand[game.dealerHandIndex - 1]);
+        printf("So his score is now %d", game.dealerScore);
+
+        if(game.dealerScore > 21)
+        {
+            print_win(&game);
+            return 1;
+        }    
+    }
 }
