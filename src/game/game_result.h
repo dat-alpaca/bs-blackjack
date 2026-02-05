@@ -1,0 +1,10 @@
+#pragma once
+
+enum
+{
+	GAME_RESULT_NONE = 0,
+	GAME_RESULT_EXIT,
+	GAME_RESULT_VICTORY,
+	GAME_RESULT_DEFEAT,
+	GAME_RESULT_DRAW
+} typedef game_result;
