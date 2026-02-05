@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <termio.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -102,7 +102,7 @@ int terminal_read_key()
 	return c;
 }
 
-// game data.h:
+// program data.h:
 typedef enum game_result
 {
 	GAME_RESULT_NONE = 0,
@@ -119,6 +119,7 @@ typedef struct client_data
 	int totalDraws;
 } client_data;
 
+// game data.h
 typedef struct deck
 {
 	int deck[DECK_SIZE];
@@ -198,7 +199,12 @@ static void game_draw_card(deck* deck, player_data* player)
 	}
 
 	player->hand[player->index] = deck->deck[deck->index];
+    
+    int card = player->hand[player->index];
 	player->score += game_get_card_value(player->hand[player->index]);
+    
+    if(card == 1 && player->score <= 11)
+        player->score += 10;
 
 	++deck->index;
 	++player->index;
@@ -279,7 +285,6 @@ static void ui_print_menu(game_data* game, ui_data* ui)
 	}
 }
 
-// game display
 static void ui_print_card(int card)
 {
 	switch (card)
@@ -336,11 +341,26 @@ static void ui_print_cards(player_data* player)
 	}
 }
 
+static void ui_reveal_cards(game_data* game)
+{
+	printf("Your cards are:\n");
+	ui_print_cards(&game->userData);
+	printf("%s%d" RESET "\n", "Total Sum: " YELLOW, game->userData.score);
+	printf("\n");
+
+	printf("The dealer cards are:\n");
+	ui_print_cards(&game->dealerData);
+	printf("%s%d" RESET "\n", "Total Sum: " YELLOW, game->dealerData.score);
+	printf("\n");
+}
+
 static void ui_print_win(game_data* game)
 {
 	printf(CLEAR_SCREEN);
 	ui_print_header(game);
+	ui_reveal_cards(game);
 
+	printf("\n");
 	printf("%s%d\n", GREEN "You Win!" RESET " You got a score of ", game->userData.score);
 	printf("The dealer got a score of: %d\n", game->dealerData.score);
 	printf("\n");
@@ -350,6 +370,7 @@ static void ui_print_lose(game_data* game)
 {
 	printf(CLEAR_SCREEN);
 	ui_print_header(game);
+	ui_reveal_cards(game);
 
 	printf("%s%d\n", RESET "Oh no! " RED "You Lost! " RESET "You got a score of ", game->userData.score);
 	printf("The dealer got a score of: %d\n", game->dealerData.score);
@@ -360,6 +381,7 @@ static void ui_print_draw(game_data* game)
 {
 	printf(CLEAR_SCREEN);
 	ui_print_header(game);
+	ui_reveal_cards(game);
 
 	printf("%s%d\n", YELLOW "It's a draw!" RESET " You got a score of ", game->userData.score);
 	printf("The dealer also got a score of: %d\n", game->dealerData.score);
@@ -547,8 +569,9 @@ static bool handle_replay()
 		int ch = terminal_read_key();
 		if (ch == 'y')
 			return true;
-		else
-			return false;
+        
+        if (ch == 'n')
+            return false;
 	}
 }
 
